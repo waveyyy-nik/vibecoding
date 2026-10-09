@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyCamp Pro: Интерактивный курс Python</title>
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --panel: #1a1a1a;
+            --card: #252525;
+            --text: #e0e0e0;
+            --muted: #9ca3af;
+            --accent: #3b82f6;
+            --success: #10b981;
+            --error: #ef4444;
+            --border: #333333;
+            --terminal-bg: #000000;
+            --terminal-text: #00ff00;
+        }
+        * { box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+            background: var(--bg); color: var(--text); margin: 0; 
+            display: flex; flex-direction: column; height: 100vh;
+        }
+        
+        /* === HEADER === */
+        .header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 20px; height: 60px; background: var(--panel); 
+            border-bottom: 1px solid var(--border); z-index: 10;
+        }
+        .logo { font-size: 1.4rem; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+        .progress-container { 
+            display: flex; align-items: center; gap: 15px; 
+            background: #111; padding: 8px 12px; border-radius: 8px;
+        }
+        .progress-bar { width: 200px; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.5s; }
+        .xp-counter { font-size: 0.85rem; color: var(--muted); }
+        .level-badge { background: var(--accent); color: #000; padding: 2px 8px; border-radius: 12px; font-weight: 600; font-size: 0.8rem; }
+
+        /* === MAIN LAYOUT === */
+        .main-content { flex: 1; display: flex; overflow: hidden; }
+        
+        /* === SIDEBAR (Навигация) === */
+        .sidebar {
+            width: 280px; background: var(--panel); border-right: 1px solid var(--border);
+            overflow-y: auto; padding: 15px 0;
+        }
+        .module-group { margin-bottom: 15px; }
+        .module-group-title { font-size: 0.85rem; text-transform: uppercase; color: var(--muted); padding: 0 15px 8px; letter-spacing: 0.5px; }
+        .module-item {
+            display: flex; align-items: center; padding: 10px 15px; margin: 4px 0;
+            border-radius: 6px; cursor: pointer; font-size: 0.95rem; transition: 0.2s;
+            gap: 10px;
+        }
+        .module-item:hover { background: #2c2c2c; }
+        .module-item.active { background: var(--accent); color: #000; }
+        .module-item.completed { background: #111; border: 1px solid var(--success); }
+        .module-item.completed::before { content: '✓'; margin-right: 8px; color: var(--success); }
+        .lock-icon { color: #555; font-size: 0.9rem; }
+
+        /* === EDITOR AREA === */
+        .editor-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        
+        .task-header {
+            padding: 15px 20px; background: var(--card); border-bottom: 1px solid var(--border);
+            font-weight: 600; font-size: 1.1rem;
+        }
+        
+        .editor-tabs { display: flex; border-bottom: 1px solid var(--border); }
+        .tab-btn { 
+            padding: 12px 20px; background: transparent; border: none; color: var(--muted);
+            cursor: pointer; font-size: 0.9rem; transition: 0.2s;
+        }
+        .tab-btn.active, .tab-btn:hover { color: var(--text); border-bottom: 2px solid var(--accent); }
+        
+        .editor-main { flex: 1; display: flex; overflow: hidden; }
+        
+        .theory-panel { 
+            width: 350px; background: #111; border-right: 1px solid var(--border);
+            overflow-y: auto; padding: 20px; font-size: 0.95rem; line-height: 1.6;
+            display: none;
+        }
+        .theory-panel.active { display: block; }
+        .theory-panel code { background: #1a1a1a; padding: 1px 4px; border-radius: 3px; color: #ffd700; }
+        .theory-panel pre { background: #000; padding: 12px; border-radius: 6px; overflow-x: auto; }
+
+        .code-container { flex: 1; display: flex; flex-direction: overflow: hidden; }
+        .code-editor { flex: 1; position: relative; }
+        textarea#code-input {
+            width: 100%; height: 100%; padding: 20px; border: none; resize: none;
+            background: #1e1e1e; color: #d4d4d4; font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 1rem; line-height: 1.5; outline: none;
+        }
+        
+        .terminal-panel { 
+            width: 350px; background: var(--terminal-bg); border-left: 1px solid #333;
+            display: flex; flex-direction: column; padding: 15px; overflow: hidden;
+        }
+        .terminal-header { font-size: 0.8rem; color: #666; margin-bottom: 10px; }
+        #terminal-output {
+            flex: 1; font-family: 'Courier New', monospace; font-size: 0.95rem; color: var(--terminal-text);
+            overflow-y: auto; white-space: pre-wrap; word-break: break-word;
+        }
+        .terminal-input-area {
+            margin-top: 10px; display: flex; gap: 8px;
+        }
+        #terminal-input {
+            flex: 1; background: #000; border: 1px solid #333; color: var(--terminal-text);
+            padding: 8px; border-radius: 4px; font-family: monospace; outline: none;
+        }
+        #send-input { background: #333; color: #00ff00; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
+
+        /* === CONTROLS === */
+        .controls { padding: 15px 20px; background: var(--panel); border-top: 1px solid var(--border); display: flex; gap: 10px; }
+        .btn { 
+            padding: 10px 16px; border: none; border-radius: 6px; font-weight: 500; cursor: pointer; 
+            transition: 0.2s; display: flex; align-items: center; gap: 6px;
+        }
+        .btn-primary { background: var(--accent); color: #000; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-success { background: var(--success); color: #000; }
+        .btn-success:hover { background: #059669; }
+        .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+        .btn-ghost:hover { background: #333; }
+        .btn-sm { padding: 6px 12px; font-size: 0.9rem; }
+        
+        /* === TOASTS (Уведомления) */
+        .toast-container {
+            position: fixed; top: 80px; right: 20px; z-index: 100;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .toast {
+            min-width: 250px; padding: 12px 16px; border-radius: 8px; color: #000;
+            display: flex; align-items: center; gap: 10px; font-size: 0.9rem;
+            animation: slideIn 0.3s ease-out;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .toast.success { background: #d1fae5; }
+        .toast.error { background: #fee2e2; }
+        .toast.info { background: #dbeafe; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 900px) {
+            .theory-panel, .terminal-panel { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+<header class="header">
+    <div class="logo">🐍 PyCamp Pro</div>
+    <div class="progress-container">
+        <div class="progress-bar"><div class="progress-fill"></div></div>
+        <div class="xp-counter"><span id="current-xp">0</span> / <span id="target-xp">100</span> XP</div>
+        <div class="level-badge" id="level-badge">Lvl 1</div>
+    </div>
+</header>
+
+<div class="main-content">
+    <nav class="sidebar" id="sidebar"></nav>
+
+    <div class="editor-area">
+        <div class="task-header" id="task-title"></div>
+        
+        <div class="editor-tabs">
+            <div class="tab-btn active" data-tab="editor">Редактор</div>
+            <div class="tab-btn" data-tab="theory">Теория</div>
+        </div>
+
+        <div class="editor-main">
+            <div class="theory-panel" id="theory-panel"></div>
+
+            <div class="code-container">
+                <div class="code-editor">
+                    <textarea id="code-input" spellcheck="false"># Твой код здесь...
+# Попробуй написать: print("Привет, PyCamp!")</textarea>
+                </div>
+                <div class="terminal-panel">
+                    <div class="terminal-header">Python Interpreter (Console)</div>
+                    <div id="terminal-output"></div>
+                    <div class="terminal-input-area">
+                        <input type="text" id="terminal-input" placeholder="Введите команду...">
+                        <button id="send-input">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-primary" id="run-btn">▶️ Выполнить</button>
+            <button class="btn btn-success" id="check-btn">✅ Проверить</button>
+            <button class="btn btn-ghost btn-sm" id="solution-btn">💡 Решение</button>
+            <button class="btn btn-ghost btn-sm" id="format-btn">🧹 Формат</button>
+            <label class="btn btn-ghost btn-sm" style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+                <input type="checkbox" id="auto-check" checked> Авто-проверка
+            </label>
+        </div>
+    </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// === ДАННЫЕ КУРСА ===
+const LEVELS = [
+    {xp: 0, name: 'Новичок'}, {xp: 100, name: 'Ученик'}, {xp: 250, name: 'Разработчик'}, 
+    {xp: 500, name: 'Программист'}, {xp: 1000, name: 'Гуру Python'}
+];
+
+const modules = [
+    {
+        id: 0, title: "1. Переменные и типы", xp: 20,
+        task: "Создайте переменную name со своим именем и переменную age со своим возрастом. Выведите их через print.",
+        solution: 'name = "Алексей"\nage = 25\nprint(f"Меня зовут {name}, мне {age} лет")',
+        check_regex: /name\s*=\s*['"].+['"]\s*[\n\r]+age\s*=\s*\d+/i,
+        theory: "<h3>Переменные</h3><p>В Python переменные создаются при присваивании. Тип данных определяется автоматически.</p><pre><code># Числа\nx = 10 # int\npi = 3.14 # float\n\n# Строки\ngreeting = 'Hello'\n\n# Логика\nis_active = True</code></pre><p><strong>f-строки</strong> — лучший способ вставлять переменные в текст: <code>print(f'Имя: {name}')</code></p>"
+    },
+    {
+        id: 1, title: "2. Условия (if/else)", xp: 25,
+        task: "Напишите программу: спросите число через input(). Если число больше 10, выведите 'Много', иначе 'Мало'.",
+        solution: 'num = int(input())\nif num > 10:\n    print("Много")\nelse:\n    print("Мало")',
+        check_regex: /input$$[\s\S]*if[\s\S]*>[\s\S]*10[\s\S]*print/i,
+        theory: "<h3>Условный оператор</h3><p>Используется для ветвления логики. Не забывайте про двоеточие и отступы (4 пробела)!</p><pre><code>if условие:\n    # блок 1\nelif другое_условие:\n    # блок 2\nelse:\n    # блок 3</code></pre><p>Для сравнения: <code>==</code> (равно), <code>!=</code> (не равно), <code>></code>, <code><</code>.</p>"
+    },
+    {
+        id: 2, title: "3. Циклы (for)", xp: 30,
+        task: "Выведите на экран таблицу умножения для числа 5 (от 1 до 10) с помощью цикла for.",
+        solution: 'for i in range(1, 11):\n    print(f"5 * {i} = {5 * i}")',
+        check_regex: /for[\s\S]*range$1\s*,\s*11$[\s\S]*print/i,
+        theory: "<h3>Цикл For</h3><p>Перебирает элементы. Функция range() генерирует числа.</p><pre><code># range(Старт, Стоп, Шаг)\nfor i in range(0, 5):\n    print(i) # 0 1 2 3 4\n\n# Перебор списка\nfruits = ['яблоко', 'груша']\nfor fruit in fruits:\n    print(fruit)</code></pre>"
+    },
+    {
+        id: 3, title: "4. Списки и методы", xp: 25,
+        task: "Создайте пустой список. Добавьте туда 3 любых города. Выведите второй город из списка.",
+        solution: 'cities = []\ncities.append("Москва")\ncities.append("Казань")\ncities.append("СПб")\nprint(cities[1])',
+        check_regex: /$$$$[\s\S]*append[\s\S]*append[\s\S]*append[\s\S]*$$\s*1\s*$$/i,
+        theory: "<h3>Списки (list)</h3><p>Изменяемые коллекции.</p><pre><code>data = [1, 2, 3]\ndata.append(4) # добавить в конец\ndata.pop() # удалить последний\nprint(data[0]) # первый элемент</code></pre>"
+    },
+    {
+        id: 4, title: "5. Функции (def)", xp: 40,
+        task: "Создайте функцию get_square(n), которая возвращает квадрат числа. Вызовите её для числа 7.",
+        solution: 'def get_square(n):\n    return n * n\n\nprint(get_square(7))',
+        check_regex: /def\s+get_square\s*$\s*n\s*$[\s\S]*return[\s\S]*print\s*$\s*get_square\s*$\s*7\s*$\s*$/i,
+        theory: "<h3>Функции</h3><p>Инкапсулируют логику. Могут принимать аргументы и возвращать результат.</p><pre><code>def calc(a, b):\n    return a + b\n\nresult = calc(5, 5)</code></pre>"
+    },
+    {
+        id: 5, title: "6. Словари (dict)", xp: 30,
+        task: "Создайте словарь пользователя с ключами 'login' и 'status'. Выведите статус.",
+        solution: 'user = {"login": "hacker", "status": "Admin"}\nprint(user["status"])',
+        check_regex: /\{[\s\S]*login[\s\S]*status[\s\S]*\}[\s\S]*print[\s\S]*status/i,
+        theory: "<h3>Словари (dict)</h3><p>Пары Ключ:Значение. Ключи неизменны.</p><pre><code>config = {'volume': 80, 'dark_mode': True}\nconfig['volume'] = 100\nprint(config.get('dark_mode', False))</code></pre>"
+    },
+    {
+        id: 6, title: "7. Классы (OOP)", xp: 50,
+        task: "Создайте класс Car с атрибутом brand. Создайте объект 'bmw' с брендом 'BMW' и выведите бренд.",
+        solution: 'class Car:\n    def __init__(self, brand):\n        self.brand = brand\n\nbmw = Car("BMW")\nprint(bmw.brand)',
+        check_regex: /class\s+Car[\s\S]*def\s+__init__[\s\S]*self\.brand[\s\S]*bmw\s*=\s*Car$[\s\S]*print\s*$\s*bmw\.brand\s*$/i,
+        theory: "<h3>Классы и Объекты</h3><p>Класс — шаблон. Объект — экземпляр класса.</p><pre><code>class Dog:\n    def __init__(self, name):\n        self.name = name\n    def voice(self):\n        print(f'{self.name} лает')\n\nrex = Dog('Рекс')\nrex.voice()</code></pre>"
+    }
+];
+
+// === СОСТОЯНИЕ ПРИЛОЖЕНИЯ ===
+let currentModuleId = 0;
+let userXP = parseInt(localStorage.getItem('pyp_xp') || '0');
+let userLevel = 0;
+
+// === UI ЭЛЕМЕНТЫ ===
+const sidebar = document.getElementById('sidebar');
+const progressFill = document.querySelector('.progress-fill');
+const currentXP = document.getElementById('current-xp');
+const targetXP = document.getElementById('target-xp');
+const levelBadge = document.getElementById('level-badge');
+const taskTitle = document.getElementById('task-title');
+const codeInput = document.getElementById('code-input');
+const runBtn = document.getElementById('run-btn');
+const checkBtn = document.getElementById('check-btn');
+const solutionBtn = document.getElementById('solution-btn');
+const formatBtn = document.getElementById('format-btn');
+const autoCheck = document.getElementById('auto-check');
+const theoryPanel = document.getElementById('theory-panel');
+const terminalOutput = document.getElementById('terminal-output');
+const terminalInput = document.getElementById('terminal-input');
+const sendInput = document.getElementById('send-input');
+const toastContainer = document.getElementById('toast-container');
+
+// === ЛОГИКА УРОВНЕЙ ===
+function updateLevel() {
+    let currentLevelData = LEVELS[userLevel];
+    let nextLevelData = LEVELS[userLevel + 1] || LEVELS[userLevel];
+    
+    levelBadge.textContent = currentLevelData.name;
+    currentXP.textContent = userXP;
+    targetXP.textContent = nextLevelData.xp;
+    
+    const progress = ((userXP - currentLevelData.xp) / (nextLevelData.xp - currentLevelData.xp)) * 100;
+    progressFill.style.width = Math.min(100, Math.max(0, progress)) + '%';
+}
+
+function addXP(amount) {
+    userXP += amount;
+    while (userXP >= LEVELS[userLevel + 1]?.xp) {
+        userLevel++;
+        showToast(`LEVEL UP! Вы достигли уровня "${LEVELS[userLevel].name}"`, 'success');
+    }
+    localStorage.setItem('pyp_xp', userXP);
+    updateLevel();
+}
+
+// === UI УПРАВЛЕНИЕ ===
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    toastContainer.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+function switchModule(id) {
+    currentModuleId = id;
+    const mod = modules[id];
+    
+    // Обновление сайдбара
+    document.querySelectorAll('.module-item').forEach(item => item.classList.remove('active'));
+    document.getElementById(`mod-${id}`).classList.add('active');
+    
+    // Обновление контента
+    taskTitle.textContent = mod.title;
+    theoryPanel.innerHTML = mod.theory;
+    loadCode(id);
+    
+    // Сохранение позиции
+    localStorage.setItem('pyp_current_module', id);
+}
+
+function loadCode(id) {
+    const saved = localStorage.getItem('pyp_code_' + id);
+    if (saved) codeInput.value = saved;
+}
+
+function saveCode(id) {
+    localStorage.setItem('pyp_code_' + id, codeInput.value);
+}
+
+// === ТЕРМИНАЛ (Эмуляция input/print) ===
+const inputQueue = [];
+let isWaitingForInput = false;
+
+function printToTerminal(text) {
+    terminalOutput.textContent += text + '\n';
+    terminalOutput.scrollTop = terminalOutput.scrollHeight;
+}
+
+function mockInput(promptText) {
+    printToTerminal(promptText);
+    return new Promise(resolve => {
+        isWaitingForInput = true;
+        sendInput.onclick = function() {
+            const val = terminalInput.value;
+            printToTerminal(val);
+            terminalInput.value = '';
+            isWaitingForInput = false;
+            resolve(val);
+        };
+    });
+}
+
+window.prompt = function(text) {
+    return mockInput(text);
+};
+window.input = function(text) {
+    return mockInput(text);
+};
+
+// === ВЫПОЛНЕНИЕ КОДА ===
+async function executeCode() {
+    const code = codeInput.value;
+    saveCode(currentModuleId);
+    terminalOutput.textContent = '';
+    
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+    
+    iframe.onload = function() {
+        const context = iframe.contentWindow;
+        
+        // Переопределяем print и input внутри iframe
+        context.print = printToTerminal;
+        context.input = mockInput;
+        context.prompt = mockInput;
+        
+        try {
+            const script = document.createElement('script');
+            script.textContent = code;
+            iframe.contentDocument.head.appendChild(script);
+        } catch (e) {
+            printToTerminal('Синтаксическая ошибка: ' + e.message);
+        } finally {
+            document.body.removeChild(iframe);
+        }
+    };
+}
+
+// === ПРОВЕРКА ЗАДАНИЯ ===
+function checkSolution() {
+    const code = codeInput.value;
+    const mod = modules[currentModuleId];
+    
+    if (mod.check_regex.test(code)) {
+        if (!localStorage.getItem('pyp_completed_' + currentModuleId)) {
+            localStorage.setItem('pyp_completed_' + currentModuleId, 'true');
+            document.getElementById(`mod-${currentModuleId}`).classList.add('completed');
+            addXP(mod.xp);
+            showToast(`Задание выполнено! +${mod.xp} XP`, 'success');
+        } else {
+            showToast('Отлично, код верный!', 'info');
+        }
+        checkBtn.classList.add('success');
+        checkBtn.textContent = '✅ Верно';
+        setTimeout(() => { checkBtn.classList.remove('success'); checkBtn.textContent = '✅ Проверить'; }, 2000);
+    } else {
+        checkBtn.classList.add('error');
+        checkBtn.textContent = '❌ Ошибка';
+        setTimeout(() => { checkBtn.classList.remove('error'); checkBtn.textContent = '✅ Проверить'; }, 2000);
+        showToast('Код работает, но не соответствует условию задачи. Проверьте внимательно.', 'error');
+    }
+}
+
+// === ИНИЦИАЛИЗАЦИЯ ===
+function renderSidebar() {
+    modules.forEach(mod => {
+        const item = document.createElement('div');
+        item.id = `mod-${mod.id}`;
+        item.className = 'module-item';
+        if (localStorage.getItem('pyp_completed_' + mod.id)) item.classList.add('completed');
+        item.textContent = mod.title;
+        item.onclick = () => switchModule(mod.id);
+        sidebar.appendChild(item);
+    });
+}
+
+// === EVENT LISTENERS ===
+runBtn.onclick = executeCode;
+checkBtn.onclick = checkSolution;
+
+solutionBtn.onclick = function() {
+    if (confirm('Это заменит ваш текущий код. Продолжить?')) {
+        codeInput.value = modules[currentModuleId].solution;
+        saveCode(currentModuleId);
+    }
+};
+
+formatBtn.onclick = function() {
+    try {
+        const lines = codeInput.value.split('\n');
+        let indent = 0;
+        let formatted = '';
+        lines.forEach(line => {
+            const trimmed = line.trim();
+            if (trimmed.endsWith(':')) {
+                formatted += '    '.repeat(indent) + trimmed + '\n';
+                indent++;
+            } else if (trimmed === 'else:' || trimmed.startsWith('elif')) {
+                indent--;
+                formatted += '    '.repeat(indent) + trimmed + '\n';
+                indent++;
+            } else if (trimmed === 'break' || trimmed === 'continue' || trimmed === 'return') {
+                formatted += '    '.repeat(indent) + trimmed + '\n';
+            } else {
+                formatted += '    '.repeat(indent) + trimmed + '\n';
+                if (trimmed.startsWith('def ') || trimmed.startsWith('class ')) indent++;
+            }
+            if (trimmed === 'pass') indent--;
+        });
+        codeInput.value = formatted;
+        saveCode(currentModuleId);
+    } catch(e) {
+        showToast('Не удалось отформатировать код', 'error');
+    }
+};
+
+autoCheck.onchange = function() {
+    if (this.checked) {
+        codeInput.oninput = () => { 
+            clearTimeout(window.checkTimer);
+            window.checkTimer = setTimeout(checkSolution, 2000); 
+        };
+    } else {
+        codeInput.oninput = null;
+    }
+};
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.onclick = function() {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        if (this.dataset.tab === 'theory') {
+            theoryPanel.classList.add('active');
+        } else {
+            theoryPanel.classList.remove('active');
+        }
+    };
+});
+
+// Запуск
+renderSidebar();
+const savedModule = parseInt(localStorage.getItem('pyp_current_module') || '0');
+switchModule(savedModule);
+updateLevel();
+if (autoCheck.checked) codeInput.oninput = () => setTimeout(checkSolution, 2000);
+
+// Обработка отправки в терминале
+terminalInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !isWaitingForInput) {
+        e.preventDefault();
+        const val = terminalInput.value;
+        if (val) {
+            printToTerminal('>>> ' + val);
+            terminalInput.value = '';
+            inputQueue.push(val);
+        }
+    }
+});
+sendInput.onclick = () => {
+    if (!isWaitingForInput && terminalInput.value) {
+        const val = terminalInput.value;
+        printToTerminal('>>> ' + val);
+        terminalInput.value = '';
+        inputQueue.push(val);
+    }
+};
+
+// Проброс ввода из очереди в iframe (если используется не наш mockInput)
+window.resolveInput = function(val) { return val; };
+</script>
+
+</body>
+</html>
